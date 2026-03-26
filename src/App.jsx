@@ -63,7 +63,67 @@ function getWeekLabel() {
   return `Semana ${fmt(monday)} – ${fmt(sunday)}, ${sunday.getFullYear()}`;
 }
 
+// ─── CAMBIA ESTA CONTRASEÑA ANTES DE SUBIR A GITHUB ───────────────────────
+const PASSWORD = "C0m3rC1alChiIIvas.2026";
+// ──────────────────────────────────────────────────────────────────────────
+
+function LoginScreen({ onLogin }) {
+  const [input, setInput] = useState("");
+  const [error, setError] = useState(false);
+  const [shake, setShake] = useState(false);
+
+  const attempt = () => {
+    if (input === PASSWORD) {
+      onLogin();
+    } else {
+      setError(true);
+      setShake(true);
+      setTimeout(() => setShake(false), 500);
+      setTimeout(() => setError(false), 2000);
+      setInput("");
+    }
+  };
+
+  return (
+    <div style={{ minHeight: "100vh", background: "#0a0a0a", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'DM Sans', 'Segoe UI', sans-serif" }}>
+      <div style={{ width: 340, animation: shake ? "shake 0.4s ease" : "none" }}>
+        <div style={{ textAlign: "center", marginBottom: 32 }}>
+          <div style={{ width: 56, height: 56, borderRadius: 14, background: "#BD0000", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 28, margin: "0 auto 16px" }}>⚽</div>
+          <div style={{ fontWeight: 800, fontSize: 20, color: "#fff", letterSpacing: "-0.3px" }}>Compromisos Comerciales</div>
+          <div style={{ fontSize: 13, color: "#555", marginTop: 4 }}>Acceso restringido al equipo de CMs</div>
+        </div>
+        <div style={{ background: "#111", border: `1px solid ${error ? "#7f1d1d" : "#1e1e1e"}`, borderRadius: 14, padding: 24, transition: "border 0.2s" }}>
+          <div style={{ fontSize: 12, color: "#666", marginBottom: 8, fontWeight: 600, textTransform: "uppercase", letterSpacing: 0.5 }}>Contraseña</div>
+          <input
+            type="password"
+            value={input}
+            onChange={e => setInput(e.target.value)}
+            onKeyDown={e => e.key === "Enter" && attempt()}
+            placeholder="••••••••••••"
+            autoFocus
+            style={{ width: "100%", background: "#0a0a0a", border: `1px solid ${error ? "#BD0000" : "#2a2a2a"}`, color: "#fff", borderRadius: 8, padding: "12px 14px", fontSize: 15, boxSizing: "border-box", marginBottom: 12, outline: "none" }}
+          />
+          {error && <div style={{ color: "#fca5a5", fontSize: 12, marginBottom: 12, textAlign: "center" }}>Contraseña incorrecta</div>}
+          <button onClick={attempt} style={{ width: "100%", background: "#BD0000", border: "none", color: "#fff", borderRadius: 8, padding: "13px 0", fontSize: 15, fontWeight: 800, cursor: "pointer", letterSpacing: "-0.2px" }}>
+            Entrar
+          </button>
+        </div>
+      </div>
+      <style>{`
+        @keyframes shake {
+          0%, 100% { transform: translateX(0); }
+          20% { transform: translateX(-8px); }
+          40% { transform: translateX(8px); }
+          60% { transform: translateX(-5px); }
+          80% { transform: translateX(5px); }
+        }
+      `}</style>
+    </div>
+  );
+}
+
 export default function App() {
+  const [authed, setAuthed] = useState(() => sessionStorage.getItem("cc-auth") === "1");
   const [compromisos, setCompromisos] = useState([]);
   const [form, setForm] = useState(emptyForm);
   const [editId, setEditId] = useState(null);
@@ -197,6 +257,8 @@ export default function App() {
   }, [compromisos]);
 
   const f = (k, v) => setForm(p => ({ ...p, [k]: v }));
+
+  if (!authed) return <LoginScreen onLogin={() => { sessionStorage.setItem("cc-auth", "1"); setAuthed(true); }} />;
 
   return (
     <div style={{
