@@ -10,6 +10,17 @@ const CM_INFO = {
   "Santiago":     { cuentas: "Chivas Esports", rol: "CM" },
   "Damián":       { cuentas: "Chivas en Inglés · Tapatío", rol: "CM" },
 };
+
+// ─── USERNAMES DE TELEGRAM DE CADA CM — EDITA ANTES DE SUBIR A GITHUB ─────
+const CM_TELEGRAM = {
+  "Rodrigo (Yo)": "@ElRodri11",
+  "Romo":         "@Romochivas",
+  "Axel":         "@axelchivas",
+  "Alondra":      "@alolealchivas",
+  "Santiago":     "@santiagolandero",
+  "Damián":       "@damchivas",
+};
+// ──────────────────────────────────────────────────────────────────────────
 const TIPOS = ["Post estático", "Story", "Reel", "Video", "Hilo en X", "Carrusel", "Live", "Post + Story"];
 const DIAS = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"];
 const ESTATUS = ["⏳ Pendiente", "✅ Publicado", "❌ Sin material", "🔄 En proceso"];
@@ -38,8 +49,8 @@ function recurrenciaLabel(c) {
 }
 
 const emptyForm = {
-  cuenta: "", dia: "", hora: "", tipo: "", patrocinador: "",
-  cm: "", link: "", notas: "", estatus: "⏳ Pendiente",
+  cuentas: [], dia: "", hora: "", tipo: "", patrocinador: "",
+  cms: [], link: "", notas: "", estatus: "⏳ Pendiente",
   recurrencia: "Una vez", diasPersonalizados: [],
   // Producción previa
   requiereProduccion: false,
@@ -144,6 +155,54 @@ export default function App() {
     } catch {}
   }, []);
 
+  // Recordatorio diario a las 18:00 hora Centro México (UTC-6)
+  useEffect(() => {
+    const checkReminder = () => {
+      const now = new Date();
+      const mexicoOffset = -6 * 60;
+      const utcMs = now.getTime() + now.getTimezoneOffset() * 60000;
+      const mexicoTime = new Date(utcMs + mexicoOffset * 60000);
+      const h = mexicoTime.getHours();
+      const m = mexicoTime.getMinutes();
+      if (h !== 18 || m !== 0) return;
+      const todayKey = `reminder-${mexicoTime.toDateString()}`;
+      if (localStorage.getItem(todayKey)) return;
+      localStorage.setItem(todayKey, "1");
+      const diasSemana = ["Domingo","Lunes","Martes","Miércoles","Jueves","Viernes","Sábado"];
+      const hoyNombre = diasSemana[mexicoTime.getDay()];
+      const saved = localStorage.getItem(STORAGE_KEY);
+      const todos = saved ? JSON.parse(saved) : [];
+      const deHoy = todos.filter(c =>
+        c.estatus !== "✅ Publicado" && (
+          c.dia === hoyNombre ||
+          c.recurrencia === "Diario" ||
+          (c.recurrencia === "Personalizado" && c.diasPersonalizados?.includes(hoyNombre))
+        )
+      );
+      if (deHoy.length === 0) return;
+      const lines = deHoy.map(c => {
+        const menciones = (c.cms||[]).map(cm => CM_TELEGRAM[cm] || cm).join(" ");
+        return `• ${(c.cuentas||[]).join(", ")} — ${c.tipo}${c.hora ? ` a las ${c.hora}` : ""}\n  👤 ${(c.cms||[]).join(", ")} ${menciones}`;
+      }).join("\n");
+      const tgRaw = localStorage.getItem("chivas-telegram");
+      if (!tgRaw) return;
+      const tgInfo = JSON.parse(tgRaw);
+      if (!tgInfo.token || !tgInfo.chatId) return;
+      const payload = {
+        chat_id: tgInfo.chatId,
+        text: `⏰ <b>Recordatorio de hoy — ${hoyNombre}</b>\n\nHay ${deHoy.length} compromiso${deHoy.length > 1 ? "s" : ""} pendiente${deHoy.length > 1 ? "s" : ""} para publicar hoy:\n\n${lines}`,
+        parse_mode: "HTML",
+      };
+      if (tgInfo.threadId) payload.message_thread_id = parseInt(tgInfo.threadId);
+      fetch(`https://api.telegram.org/bot${tgInfo.token}/sendMessage`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      }).catch(() => {});
+    };
+    const interval = setInterval(checkReminder, 60000);
+    return () => clearInterval(interval);
+  }, []);
+
   const save = (data) => {
     setCompromisos(data);
     try { localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); } catch {}
@@ -168,7 +227,7 @@ export default function App() {
   };
 
   const handleSubmit = () => {
-    if (!form.cuenta || !form.dia || !form.tipo || !form.cm) {
+    if (!form.cuentas?.length || !form.dia || !form.tipo || !form.cms?.length) {
       showToast("Completa los campos obligatorios", "error");
       return;
     }
@@ -179,10 +238,11 @@ export default function App() {
     } else {
       const nuevo = { ...form, id: Date.now() };
       newData = [...compromisos, nuevo];
+      const menciones = form.cms.map(cm => CM_TELEGRAM[cm] || cm).join(" ");
       const prodLine = form.requiereProduccion
         ? `\n\n🎬 <b>Producción previa requerida</b>\n👷 CM produce: ${form.cmProduccion}\n📦 Entregar antes de: ${form.fechaEntregaProduccion}\n✍️ Autoriza: ${form.clienteAutoriza}\n📅 Publicación: ${form.fechaPublicacion}`
         : "";
-      const msg = `🔴 <b>Nuevo compromiso comercial</b>\n\n📱 <b>Cuenta:</b> ${form.cuenta}\n📅 <b>Día:</b> ${form.dia} ${form.hora}\n🎯 <b>Tipo:</b> ${form.tipo}\n🏢 <b>Patrocinador:</b> ${form.patrocinador || "—"}\n👤 <b>CM publica:</b> ${form.cm}${prodLine}\n${form.link ? `🔗 Link: ${form.link}\n` : ""}${form.notas ? `📝 Notas: ${form.notas}` : ""}`;
+      const msg = `🔴 <b>Nuevo compromiso comercial</b>\n\n📱 <b>Cuenta(s):</b> ${form.cuentas.join(", ")}\n📅 <b>Día:</b> ${form.dia}${form.hora ? ` ${form.hora}` : ""}\n🎯 <b>Tipo:</b> ${form.tipo}\n🏢 <b>Patrocinador:</b> ${form.patrocinador || "—"}\n👤 <b>CM(s):</b> ${form.cms.join(", ")} ${menciones}${prodLine}\n${form.link ? `🔗 Link: ${form.link}\n` : ""}${form.notas ? `📝 Notas: ${form.notas}` : ""}`;
       sendTelegram(msg);
       showToast("Compromiso agregado ✓");
     }
@@ -211,17 +271,17 @@ export default function App() {
   };
 
   const filtered = useMemo(() => compromisos.filter(c =>
-    (!filtros.cuenta || c.cuenta === filtros.cuenta) &&
-    (!filtros.cm || c.cm === filtros.cm) &&
+    (!filtros.cuenta || c.cuentas?.includes(filtros.cuenta)) &&
+    (!filtros.cm || c.cms?.includes(filtros.cm)) &&
     (!filtros.estatus || c.estatus === filtros.estatus)
   ), [compromisos, filtros]);
 
   const pendientes = compromisos.filter(c => c.estatus === "⏳ Pendiente");
 
   const exportCSV = () => {
-    const header = ["Cuenta","Día","Hora","Tipo","Patrocinador","CM","Link","Notas","Estatus"];
+    const header = ["Cuentas","Día","Hora","Tipo","Patrocinador","CMs","Link","Notas","Estatus"];
     const rows = compromisos.map(c =>
-      [c.cuenta,c.dia,c.hora,c.tipo,c.patrocinador,c.cm,c.link,c.notas,c.estatus]
+      [(c.cuentas||[]).join("|"),c.dia,c.hora,c.tipo,c.patrocinador,(c.cms||[]).join("|"),c.link,c.notas,c.estatus]
         .map(v => `"${(v||"").replace(/"/g,'""')}"`).join(",")
     );
     const csv = [header.join(","), ...rows].join("\n");
@@ -233,9 +293,10 @@ export default function App() {
   };
 
   const sendWeeklyReminder = () => {
-    const lines = compromisos.map(c =>
-      `• [${c.dia} ${c.hora}] ${c.cuenta} — ${c.tipo} (${c.cm}) ${c.estatus}`
-    ).join("\n");
+    const lines = compromisos.map(c => {
+      const menciones = (c.cms||[]).map(cm => CM_TELEGRAM[cm] || cm).join(" ");
+      return `• [${c.dia}${c.hora ? ` ${c.hora}` : ""}] ${(c.cuentas||[]).join(", ")} — ${c.tipo} → ${(c.cms||[]).join(", ")} ${menciones} ${c.estatus}`;
+    }).join("\n");
     const msg = `📋 <b>Compromisos comerciales de la semana</b>\n<i>${getWeekLabel()}</i>\n\n${lines || "Sin compromisos registrados."}`;
     sendTelegram(msg);
     showToast("Resumen enviado a Telegram ✓");
@@ -244,7 +305,7 @@ export default function App() {
   const resumenCM = useMemo(() => {
     const map = {};
     CMS.forEach(cm => {
-      const mine = compromisos.filter(c => c.cm === cm);
+      const mine = compromisos.filter(c => c.cms?.includes(cm));
       if (mine.length === 0) return;
       map[cm] = {
         total: mine.length,
@@ -412,17 +473,24 @@ export default function App() {
                     <div key={dia}>
                       <div style={{ fontSize: 12, fontWeight: 700, color: "#555", textTransform: "uppercase", letterSpacing: 1, marginBottom: 8, paddingLeft: 4 }}>{dia}</div>
                       {diaCompromisos.map(c => {
-                        const col = COLORES_CUENTA[c.cuenta] || { bg: "#111", accent: "#666", light: "#1a1a1a" };
+                        const firstCuenta = c.cuentas?.[0] || "";
+                        const col = COLORES_CUENTA[firstCuenta] || { bg: "#111", accent: "#666", light: "#1a1a1a" };
                         return (
                           <div key={c.id} style={{ background: col.light, border: `1px solid ${col.accent}33`, borderRadius: 12, padding: "14px 16px", marginBottom: 8, display: "flex", alignItems: "center", gap: 16, transition: "all 0.15s" }}>
                             <div style={{ width: 4, height: 48, borderRadius: 4, background: col.accent, flexShrink: 0 }} />
                             <div style={{ flex: 1, display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: "8px 16px", alignItems: "center" }}>
                               <div>
-                                <div style={{ fontSize: 11, color: "#666", marginBottom: 2 }}>CUENTA</div>
-                                <div style={{ fontWeight: 700, fontSize: 14, color: col.accent }}>{c.cuenta}</div>
+                                <div style={{ fontSize: 11, color: "#666", marginBottom: 2 }}>CUENTA(S)</div>
+                                <div style={{ fontWeight: 700, fontSize: 13 }}>
+                                  {(c.cuentas||[]).map((cu, i) => (
+                                    <span key={cu} style={{ color: COLORES_CUENTA[cu]?.accent || col.accent }}>
+                                      {cu}{i < c.cuentas.length - 1 ? <span style={{ color: "#444" }}> · </span> : ""}
+                                    </span>
+                                  ))}
+                                </div>
                               </div>
                               <div>
-                                <div style={{ fontSize: 11, color: "#666", marginBottom: 2 }}>HORA · TIPO</div>
+                                <div style={{ fontSize: 11, color: "#666", marginBottom: 2 }}>TIPO</div>
                                 <div style={{ fontWeight: 600, fontSize: 13 }}>{c.hora ? `${c.hora} · ` : ""}{c.tipo}</div>
                                 {recurrenciaLabel(c) && (
                                   <div style={{ marginTop: 4, fontSize: 11, color: "#93c5fd", fontWeight: 600 }}>{recurrenciaLabel(c)}</div>
@@ -433,8 +501,8 @@ export default function App() {
                                 <div style={{ fontSize: 13 }}>{c.patrocinador || <span style={{ color: "#444" }}>—</span>}</div>
                               </div>
                               <div>
-                                <div style={{ fontSize: 11, color: "#666", marginBottom: 2 }}>CM</div>
-                                <div style={{ fontSize: 13, fontWeight: 600 }}>{c.cm}</div>
+                                <div style={{ fontSize: 11, color: "#666", marginBottom: 2 }}>CM(S)</div>
+                                <div style={{ fontSize: 13, fontWeight: 600 }}>{(c.cms||[]).join(" · ")}</div>
                               </div>
                               {c.notas && (
                                 <div style={{ gridColumn: "1/-1" }}>
@@ -487,11 +555,9 @@ export default function App() {
 
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
               {[
-                ["cuenta", "Cuenta *", "select", CUENTAS],
                 ["hora", "Hora (opcional)", "time"],
                 ["tipo", "Tipo de contenido *", "select", TIPOS],
                 ["patrocinador", "Patrocinador / Marca", "text", null, "Ej. Telmex, Heineken..."],
-                ["cm", "CM Responsable *", "select", CMS],
               ].map(([key, label, type, opts, ph]) => (
                 <div key={key}>
                   <div style={{ fontSize: 12, color: "#666", marginBottom: 6, fontWeight: 600, textTransform: "uppercase", letterSpacing: 0.5 }}>{label}</div>
@@ -507,6 +573,45 @@ export default function App() {
                   )}
                 </div>
               ))}
+
+              {/* CUENTAS multi-select */}
+              <div style={{ gridColumn: "1/-1" }}>
+                <div style={{ fontSize: 12, color: "#666", marginBottom: 8, fontWeight: 600, textTransform: "uppercase", letterSpacing: 0.5 }}>Cuenta(s) *</div>
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                  {CUENTAS.map(cu => {
+                    const sel = form.cuentas?.includes(cu);
+                    const col = COLORES_CUENTA[cu] || { accent: "#666", light: "#1a1a1a" };
+                    return (
+                      <button key={cu} onClick={() => {
+                        const curr = form.cuentas || [];
+                        f("cuentas", sel ? curr.filter(x => x !== cu) : [...curr, cu]);
+                      }}
+                        style={{ padding: "8px 14px", borderRadius: 8, border: `1px solid ${sel ? col.accent : "#222"}`, background: sel ? col.light : "#111", color: sel ? col.accent : "#666", fontSize: 13, cursor: "pointer", fontWeight: sel ? 700 : 400, transition: "all 0.15s" }}>
+                        {cu}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* CMs multi-select */}
+              <div style={{ gridColumn: "1/-1" }}>
+                <div style={{ fontSize: 12, color: "#666", marginBottom: 8, fontWeight: 600, textTransform: "uppercase", letterSpacing: 0.5 }}>CM(s) Responsable(s) *</div>
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                  {CMS.map(cm => {
+                    const sel = form.cms?.includes(cm);
+                    return (
+                      <button key={cm} onClick={() => {
+                        const curr = form.cms || [];
+                        f("cms", sel ? curr.filter(x => x !== cm) : [...curr, cm]);
+                      }}
+                        style={{ padding: "8px 14px", borderRadius: 8, border: `1px solid ${sel ? "#BD0000" : "#222"}`, background: sel ? "#2d0000" : "#111", color: sel ? "#fff" : "#666", fontSize: 13, cursor: "pointer", fontWeight: sel ? 700 : 400, transition: "all 0.15s" }}>
+                        {cm}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
 
               {/* RECURRENCIA */}
               <div style={{ gridColumn: "1/-1" }}>
@@ -709,7 +814,7 @@ export default function App() {
               <div style={{ background: "#111", borderRadius: 12, padding: 20, border: "1px solid #1a1a1a" }}>
                 <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 16 }}>Por Cuenta</div>
                 {CUENTAS.map(cuenta => {
-                  const mine = compromisos.filter(c => c.cuenta === cuenta);
+                  const mine = compromisos.filter(c => c.cuentas?.includes(cuenta));
                   if (mine.length === 0) return null;
                   const col = COLORES_CUENTA[cuenta] || { accent: "#666" };
                   return (
@@ -734,13 +839,13 @@ export default function App() {
                 {pendientes.map(c => (
                   <div key={c.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 0", borderBottom: "1px solid #2a1f00" }}>
                     <div style={{ fontSize: 13 }}>
-                      <span style={{ fontWeight: 700, color: COLORES_CUENTA[c.cuenta]?.accent || "#fff" }}>{c.cuenta}</span>
+                      <span style={{ fontWeight: 700, color: COLORES_CUENTA[c.cuentas?.[0]]?.accent || "#fff" }}>{(c.cuentas||[]).join(", ")}</span>
                       <span style={{ color: "#888", margin: "0 8px" }}>·</span>
                       <span>{c.dia} {c.hora}</span>
                       <span style={{ color: "#888", margin: "0 8px" }}>·</span>
                       <span>{c.tipo}</span>
                     </div>
-                    <div style={{ fontSize: 12, color: "#888" }}>{c.cm}</div>
+                    <div style={{ fontSize: 12, color: "#888" }}>{(c.cms||[]).join(", ")}</div>
                   </div>
                 ))}
               </div>
