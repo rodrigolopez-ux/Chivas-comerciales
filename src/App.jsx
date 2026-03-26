@@ -38,7 +38,7 @@ function recurrenciaLabel(c) {
 }
 
 const emptyForm = {
-  cuenta: "", dia: "", hora: "10:00", tipo: "", patrocinador: "",
+  cuenta: "", dia: "", hora: "", tipo: "", patrocinador: "",
   cm: "", link: "", notas: "", estatus: "⏳ Pendiente",
   recurrencia: "Una vez", diasPersonalizados: [],
   // Producción previa
@@ -423,7 +423,7 @@ export default function App() {
                               </div>
                               <div>
                                 <div style={{ fontSize: 11, color: "#666", marginBottom: 2 }}>HORA · TIPO</div>
-                                <div style={{ fontWeight: 600, fontSize: 13 }}>{c.hora} · {c.tipo}</div>
+                                <div style={{ fontWeight: 600, fontSize: 13 }}>{c.hora ? `${c.hora} · ` : ""}{c.tipo}</div>
                                 {recurrenciaLabel(c) && (
                                   <div style={{ marginTop: 4, fontSize: 11, color: "#93c5fd", fontWeight: 600 }}>{recurrenciaLabel(c)}</div>
                                 )}
@@ -488,7 +488,7 @@ export default function App() {
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
               {[
                 ["cuenta", "Cuenta *", "select", CUENTAS],
-                ["hora", "Hora *", "time"],
+                ["hora", "Hora (opcional)", "time"],
                 ["tipo", "Tipo de contenido *", "select", TIPOS],
                 ["patrocinador", "Patrocinador / Marca", "text", null, "Ej. Telmex, Heineken..."],
                 ["cm", "CM Responsable *", "select", CMS],
