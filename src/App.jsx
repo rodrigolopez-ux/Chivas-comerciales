@@ -53,7 +53,7 @@ const emptyForm = {
   titulo: "",
   cuentas: [], dia: "", hora: "", tipo: "", patrocinador: "",
   cms: [], link: "", notas: "", estatus: "⏳ Pendiente",
-  recurrencia: "Una vez", diasPersonalizados: [],
+  recurrencia: "Una vez", diasPersonalizados: [], fechasEspecificas: [],
   // Producción previa
   requiereProduccion: false,
   cmProduccion: "",
@@ -77,8 +77,62 @@ function getWeekLabel() {
 }
 
 // ─── CAMBIA ESTA CONTRASEÑA ANTES DE SUBIR A GITHUB ───────────────────────
-const PASSWORD = "C0m3rC1alChiIIvas.2026";
+const PASSWORD = "C0m3rC1alChiIIvas.2026;
 // ──────────────────────────────────────────────────────────────────────────
+
+function MiniCalendar({ selected, onChange }) {
+  const [viewDate, setViewDate] = useState(() => new Date());
+  const year = viewDate.getFullYear();
+  const month = viewDate.getMonth();
+  const monthName = viewDate.toLocaleDateString("es-MX", { month: "long", year: "numeric" });
+  const firstDay = new Date(year, month, 1).getDay();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const pad = (firstDay === 0 ? 6 : firstDay - 1);
+  const cells = Array(pad).fill(null).concat(Array.from({ length: daysInMonth }, (_, i) => i + 1));
+  const toKey = (d) => `${year}-${String(month + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+  const toggle = (d) => {
+    const key = toKey(d);
+    onChange(selected.includes(key) ? selected.filter(k => k !== key) : [...selected, key]);
+  };
+  const prevMonth = () => setViewDate(new Date(year, month - 1, 1));
+  const nextMonth = () => setViewDate(new Date(year, month + 1, 1));
+  const today = new Date().toISOString().split("T")[0];
+
+  return (
+    <div style={{ background: "#111", border: "1px solid #1e1e1e", borderRadius: 12, padding: 16, userSelect: "none" }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+        <button onClick={prevMonth} style={{ background: "none", border: "none", color: "#666", cursor: "pointer", fontSize: 18, padding: "0 8px" }}>‹</button>
+        <div style={{ fontWeight: 700, fontSize: 13, color: "#ccc", textTransform: "capitalize" }}>{monthName}</div>
+        <button onClick={nextMonth} style={{ background: "none", border: "none", color: "#666", cursor: "pointer", fontSize: 18, padding: "0 8px" }}>›</button>
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 2, marginBottom: 4 }}>
+        {["L","Ma","Mi","J","V","S","D"].map(d => (
+          <div key={d} style={{ textAlign: "center", fontSize: 11, color: "#444", fontWeight: 700, padding: "4px 0" }}>{d}</div>
+        ))}
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 2 }}>
+        {cells.map((d, i) => {
+          if (!d) return <div key={`e-${i}`} />;
+          const key = toKey(d);
+          const isSel = selected.includes(key);
+          const isToday = key === today;
+          return (
+            <button key={key} onClick={() => toggle(d)}
+              style={{
+                padding: "7px 0", borderRadius: 6, border: `1px solid ${isSel ? "#0056A6" : isToday ? "#333" : "transparent"}`,
+                background: isSel ? "#0f1a2d" : "transparent",
+                color: isSel ? "#93c5fd" : isToday ? "#fff" : "#666",
+                fontSize: 12, fontWeight: isSel ? 700 : 400, cursor: "pointer",
+                transition: "all 0.1s",
+              }}>
+              {d}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
 
 function LoginScreen({ onLogin }) {
   const [input, setInput] = useState("");
@@ -229,8 +283,9 @@ export default function App() {
   };
 
   const handleSubmit = () => {
-    if (!form.titulo || !form.cuentas?.length || !form.dia || !form.tipo || !form.cms?.length) {
-      showToast("Completa los campos obligatorios", "error");
+    const tieneFecha = form.dia || form.fechasEspecificas?.length > 0;
+    if (!form.titulo || !form.cuentas?.length || !tieneFecha || !form.tipo || !form.cms?.length) {
+      showToast("Completa: título, cuenta(s), fecha, tipo y CM(s)", "error");
       return;
     }
     let newData;
@@ -502,6 +557,11 @@ export default function App() {
                                 {recurrenciaLabel(c) && (
                                   <div style={{ marginTop: 4, fontSize: 11, color: "#93c5fd", fontWeight: 600 }}>{recurrenciaLabel(c)}</div>
                                 )}
+                                {c.fechasEspecificas?.length > 0 && (
+                                  <div style={{ marginTop: 4, fontSize: 11, color: "#6ee7b7" }}>
+                                    📅 {c.fechasEspecificas.sort().map(f => new Date(f + "T12:00:00").toLocaleDateString("es-MX", { day: "numeric", month: "short" })).join(", ")}
+                                  </div>
+                                )}
                               </div>
                               <div>
                                 <div style={{ fontSize: 11, color: "#666", marginBottom: 2 }}>PATROCINADOR</div>
@@ -679,8 +739,28 @@ export default function App() {
                 )}
               </div>
 
+              {/* CALENDARIO — FECHAS ESPECÍFICAS */}
               <div style={{ gridColumn: "1/-1" }}>
-                <div style={{ fontSize: 12, color: "#666", marginBottom: 6, fontWeight: 600, textTransform: "uppercase", letterSpacing: 0.5 }}>Link de recursos</div>
+                <div style={{ fontSize: 12, color: "#666", marginBottom: 8, fontWeight: 600, textTransform: "uppercase", letterSpacing: 0.5 }}>
+                  📅 Fechas específicas de publicación
+                  <span style={{ fontSize: 11, fontWeight: 400, color: "#444", marginLeft: 8 }}>opcional — complementa la frecuencia</span>
+                </div>
+                <MiniCalendar
+                  selected={form.fechasEspecificas || []}
+                  onChange={fechas => f("fechasEspecificas", fechas)}
+                />
+                {form.fechasEspecificas?.length > 0 && (
+                  <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 10 }}>
+                    {form.fechasEspecificas.sort().map(fecha => (
+                      <div key={fecha} style={{ background: "#0f1a2d", border: "1px solid #0056A6", borderRadius: 6, padding: "4px 10px", fontSize: 12, color: "#93c5fd", display: "flex", alignItems: "center", gap: 6 }}>
+                        {new Date(fecha + "T12:00:00").toLocaleDateString("es-MX", { day: "numeric", month: "short" })}
+                        <span onClick={() => f("fechasEspecificas", form.fechasEspecificas.filter(f => f !== fecha))}
+                          style={{ cursor: "pointer", color: "#555", fontWeight: 700 }}>×</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
                 <input value={form.link} onChange={e => f("link", e.target.value)} placeholder="https://drive.google.com/..."
                   style={{ width: "100%", background: "#111", border: "1px solid #222", color: "#fff", borderRadius: 8, padding: "11px 12px", fontSize: 14, boxSizing: "border-box" }} />
               </div>
