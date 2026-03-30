@@ -77,7 +77,7 @@ function getWeekLabel() {
 }
 
 // ─── CAMBIA ESTA CONTRASEÑA ANTES DE SUBIR A GITHUB ───────────────────────
-const PASSWORD = "C0m3rC1alChiIIvas.2026;
+const PASSWORD = "C0m3rC1alChiIIvas.2026";
 // ──────────────────────────────────────────────────────────────────────────
 
 function MiniCalendar({ selected, onChange }) {
@@ -283,7 +283,11 @@ export default function App() {
   };
 
   const handleSubmit = () => {
-    const tieneFecha = form.dia || form.fechasEspecificas?.length > 0;
+    const tieneFecha =
+      form.dia ||
+      form.fechasEspecificas?.length > 0 ||
+      form.recurrencia === "Diario" ||
+      (form.recurrencia === "Personalizado" && form.diasPersonalizados?.length > 0);
     if (!form.titulo || !form.cuentas?.length || !tieneFecha || !form.tipo || !form.cms?.length) {
       showToast("Completa: título, cuenta(s), fecha, tipo y CM(s)", "error");
       return;
