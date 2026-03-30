@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 
-const CUENTAS = ["CHIVASTV", "Estadio AKRON", "Chivas Femenil", "Tapatío", "Chivas en Inglés", "Rebaño Chivas", "Chivas Esports"];
+const CUENTAS = ["Chivas", "CHIVASTV", "Estadio AKRON", "Chivas Femenil", "Tapatío", "Chivas en Inglés", "Rebaño Chivas", "Chivas Esports"];
 const CMS = ["Rodrigo (Yo)", "Romo", "Axel", "Alondra", "Santiago", "Damián"];
 const CM_INFO = {
   "Rodrigo (Yo)": { cuentas: "CHIVASTV · Estadio AKRON", rol: "CM" },
@@ -27,6 +27,7 @@ const ESTATUS = ["⏳ Pendiente", "✅ Publicado", "❌ Sin material", "🔄 En 
 const ESTATUS_PROD = ["⏳ Por grabar/producir", "🎬 En producción", "🔍 En revisión/autorización", "✅ Autorizado", "❌ Rechazado"];
 
 const COLORES_CUENTA = {
+  "Chivas":          { bg: "#1a0a0a", accent: "#BD0000", light: "#2a0a0a" },
   "CHIVASTV":        { bg: "#1a0a0a", accent: "#BD0000", light: "#2d0f0f" },
   "Estadio AKRON":   { bg: "#0a0f1a", accent: "#0056A6", light: "#0f1a2d" },
   "Chivas Femenil":  { bg: "#1a0a14", accent: "#C41E8A", light: "#2d0f20" },
@@ -49,6 +50,7 @@ function recurrenciaLabel(c) {
 }
 
 const emptyForm = {
+  titulo: "",
   cuentas: [], dia: "", hora: "", tipo: "", patrocinador: "",
   cms: [], link: "", notas: "", estatus: "⏳ Pendiente",
   recurrencia: "Una vez", diasPersonalizados: [],
@@ -227,7 +229,7 @@ export default function App() {
   };
 
   const handleSubmit = () => {
-    if (!form.cuentas?.length || !form.dia || !form.tipo || !form.cms?.length) {
+    if (!form.titulo || !form.cuentas?.length || !form.dia || !form.tipo || !form.cms?.length) {
       showToast("Completa los campos obligatorios", "error");
       return;
     }
@@ -242,7 +244,7 @@ export default function App() {
       const prodLine = form.requiereProduccion
         ? `\n\n🎬 <b>Producción previa requerida</b>\n👷 CM produce: ${form.cmProduccion}\n📦 Entregar antes de: ${form.fechaEntregaProduccion}\n✍️ Autoriza: ${form.clienteAutoriza}\n📅 Publicación: ${form.fechaPublicacion}`
         : "";
-      const msg = `🔴 <b>Nuevo compromiso comercial</b>\n\n📱 <b>Cuenta(s):</b> ${form.cuentas.join(", ")}\n📅 <b>Día:</b> ${form.dia}${form.hora ? ` ${form.hora}` : ""}\n🎯 <b>Tipo:</b> ${form.tipo}\n🏢 <b>Patrocinador:</b> ${form.patrocinador || "—"}\n👤 <b>CM(s):</b> ${form.cms.join(", ")} ${menciones}${prodLine}\n${form.link ? `🔗 Link: ${form.link}\n` : ""}${form.notas ? `📝 Notas: ${form.notas}` : ""}`;
+      const msg = `🔴 <b>Nuevo compromiso comercial</b>\n<b>${form.titulo}</b>\n\n📱 <b>Cuenta(s):</b> ${form.cuentas.join(", ")}\n📅 <b>Día:</b> ${form.dia}${form.hora ? ` ${form.hora}` : ""}\n🎯 <b>Tipo:</b> ${form.tipo}\n🏢 <b>Patrocinador:</b> ${form.patrocinador || "—"}\n👤 <b>CM(s):</b> ${form.cms.join(", ")} ${menciones}${prodLine}\n${form.link ? `🔗 Link: ${form.link}\n` : ""}${form.notas ? `📝 Notas: ${form.notas}` : ""}`;
       sendTelegram(msg);
       showToast("Compromiso agregado ✓");
     }
@@ -279,9 +281,9 @@ export default function App() {
   const pendientes = compromisos.filter(c => c.estatus === "⏳ Pendiente");
 
   const exportCSV = () => {
-    const header = ["Cuentas","Día","Hora","Tipo","Patrocinador","CMs","Link","Notas","Estatus"];
+    const header = ["Título","Cuentas","Día","Hora","Tipo","Patrocinador","CMs","Link","Notas","Estatus"];
     const rows = compromisos.map(c =>
-      [(c.cuentas||[]).join("|"),c.dia,c.hora,c.tipo,c.patrocinador,(c.cms||[]).join("|"),c.link,c.notas,c.estatus]
+      [c.titulo,(c.cuentas||[]).join("|"),c.dia,c.hora,c.tipo,c.patrocinador,(c.cms||[]).join("|"),c.link,c.notas,c.estatus]
         .map(v => `"${(v||"").replace(/"/g,'""')}"`).join(",")
     );
     const csv = [header.join(","), ...rows].join("\n");
@@ -479,6 +481,11 @@ export default function App() {
                           <div key={c.id} style={{ background: col.light, border: `1px solid ${col.accent}33`, borderRadius: 12, padding: "14px 16px", marginBottom: 8, display: "flex", alignItems: "center", gap: 16, transition: "all 0.15s" }}>
                             <div style={{ width: 4, height: 48, borderRadius: 4, background: col.accent, flexShrink: 0 }} />
                             <div style={{ flex: 1, display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: "8px 16px", alignItems: "center" }}>
+                              {c.titulo && (
+                                <div style={{ gridColumn: "1/-1", marginBottom: 4 }}>
+                                  <div style={{ fontWeight: 800, fontSize: 15, color: "#fff", letterSpacing: "-0.2px" }}>{c.titulo}</div>
+                                </div>
+                              )}
                               <div>
                                 <div style={{ fontSize: 11, color: "#666", marginBottom: 2 }}>CUENTA(S)</div>
                                 <div style={{ fontWeight: 700, fontSize: 13 }}>
@@ -554,6 +561,12 @@ export default function App() {
             <div style={{ color: "#555", fontSize: 13, marginBottom: 28 }}>Los campos marcados con * son obligatorios</div>
 
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+              {/* TÍTULO */}
+              <div style={{ gridColumn: "1/-1" }}>
+                <div style={{ fontSize: 12, color: "#666", marginBottom: 6, fontWeight: 600, textTransform: "uppercase", letterSpacing: 0.5 }}>Título del compromiso *</div>
+                <input value={form.titulo} onChange={e => f("titulo", e.target.value)} placeholder="Ej. Saludo de jugador para Caliente, Banner Heineken jornada 12..."
+                  style={{ width: "100%", background: "#111", border: `1px solid ${form.titulo ? "#333" : "#222"}`, color: "#fff", borderRadius: 8, padding: "11px 12px", fontSize: 14, boxSizing: "border-box" }} />
+              </div>
               {[
                 ["hora", "Hora (opcional)", "time"],
                 ["tipo", "Tipo de contenido *", "select", TIPOS],
